@@ -74,7 +74,7 @@ raw results live in `.runproof/observer-benchmark.json`. Scheduler variation on 
 substantial; negative measured overhead is noise, not a speedup claim. This experiment alone
 does not qualify production overhead or Linux behavior.
 
-## Remaining release gates
+## Remaining production qualification
 
 1. Run the installed local Ollama model against previously unseen projects and record its
    actual completion and failure rates. Mock protocol tests are not a substitute for this check.

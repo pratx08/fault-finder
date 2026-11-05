@@ -9,8 +9,9 @@ reserved until the first upload. Confirm it again immediately before publishing.
 1. Confirm `fault-finder` is still available on PyPI and TestPyPI.
 2. Commit and push the reviewed source to the owner's repository. Configure private security
    reporting and a protected `pypi` GitHub environment.
-3. Pass the Windows/Linux Python matrix, actual Docker test, live-model evaluation and clean
-   wheel installation. Check the runtime dependency audit and resolve findings.
+3. Pass the Windows/Linux Python matrix, actual Docker test and clean wheel installation.
+   Check the runtime dependency audit and resolve findings. Record live-model and performance
+   limitations explicitly for an alpha release.
 4. Build both source and wheel artifacts, run strict metadata/content checks, and record hashes.
 5. Verify the README, supported versions and limitations against actual evidence. Do not use a
    stable/production classifier merely because packaging succeeds.
