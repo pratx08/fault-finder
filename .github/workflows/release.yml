@@ -1,0 +1,49 @@
+name: publish
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+  build:
+    needs: checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --python 3.12
+      - name: Check release tag
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: uv run python -c "import os,tomllib; p=tomllib.load(open('pyproject.toml','rb')); assert os.environ['RELEASE_TAG']=='v'+p['project']['version']"
+      - run: uv build --out-dir dist
+      - run: uv run twine check --strict dist/*
+      - run: uv run python tools/release_check.py --dist dist
+      - run: uv export --frozen --no-dev --no-emit-project --format requirements-txt --output-file runtime-requirements.txt
+      - run: uv run pip-audit -r runtime-requirements.txt --no-deps --disable-pip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.event.release.prerelease && 'testpypi' || 'pypi' }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+      - name: Publish prerelease to TestPyPI
+        if: github.event.release.prerelease
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+      - name: Publish stable release to PyPI
+        if: ${{ !github.event.release.prerelease }}
+        uses: pypa/gh-action-pypi-publish@release/v1

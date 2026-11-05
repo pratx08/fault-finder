@@ -1,0 +1,44 @@
+name: checks
+on: [push, pull_request, workflow_call]
+permissions:
+  contents: read
+jobs:
+  python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --python ${{ matrix.python }}
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy src/faultfinder
+      - run: uv run pytest -m "not docker" --junitxml=test-results.xml
+      - run: uv build --out-dir build-dist
+      - run: uv run twine check --strict build-dist/*
+      - run: uv run python tools/release_check.py --dist build-dist
+      - run: uv venv wheel-env --python ${{ matrix.python }}
+      - name: Smoke test wheel on Linux
+        if: runner.os == 'Linux'
+        run: |
+          uv pip install --python wheel-env/bin/python build-dist/*.whl
+          wheel-env/bin/python tools/installed_smoke.py
+      - name: Smoke test wheel on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $wheel = (Get-ChildItem build-dist/*.whl).FullName
+          uv pip install --python wheel-env/Scripts/python.exe $wheel
+          wheel-env/Scripts/python.exe tools/installed_smoke.py
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --frozen --python 3.12
+      - run: docker build -t faultfinder-worker:local .
+      - run: uv run pytest -m docker
+      - run: docker run --rm --entrypoint python -v "${{ github.workspace }}/tests:/tests:ro" faultfinder-worker:local -m pytest /tests/test_verification.py /tests/test_observer.py /tests/test_end_to_end.py /tests/test_agent_workflow.py -q

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">
+<title>Fault Finder — {{ evidence.plan.title }}</title>
+<style>
+body{font:16px/1.6 system-ui,sans-serif;color:#172b41;background:#f4f6f8;margin:0}main{max-width:1080px;margin:36px auto;padding:32px;background:white;border-radius:12px}h1{font-size:30px;margin:0}h2{margin-top:32px}small,.muted{color:#526579}.badge{display:inline-block;padding:5px 12px;background:#e8edf4;border-radius:6px;font-weight:650}table{border-collapse:collapse;width:100%;font-size:14px}td,th{text-align:left;padding:8px;border-bottom:1px solid #dce3ea;overflow-wrap:anywhere}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f4f6f8;padding:16px}svg{max-width:100%;height:auto}li{margin:6px 0}.scroll{overflow-x:auto}
+</style></head><body><main>
+<small>FAULT FINDER · MEMORY EVIDENCE · SCHEMA {{ evidence.schema_version }}</small>
+<h1>{{ evidence.plan.title }}</h1><p class="badge">{{ evidence.assessment.verdict }}</p>
+<p>{{ evidence.assessment.reason }}</p>
+<p class="muted">{{ evidence.created_at }} · {{ evidence.backend }} execution · {{ evidence.id }}</p>
+{% if evidence.assessment.growth_per_operation is not none %}<p><strong>{{ '%.3f'|format(evidence.assessment.growth_per_operation) }} {{ evidence.assessment.metric }} per operation</strong> over the tested range.</p>{% endif %}
+<h2>Measured retention</h2><p>Each point is one fresh-process trial. Blue: subject. Green: control. Metric: {{ metric }}. Negative byte deltas are plotted at zero; exact values remain below.</p>
+<svg viewBox="0 0 800 280" role="img" aria-label="Retention against completed operations">
+<path d="M50 30V230H750" fill="none" stroke="#526579"/><text x="50" y="255">0</text><text x="670" y="255">{{ maximum_x }} operations</text><text x="55" y="22">{{ maximum_y }}</text>
+{% for p in chart %}<circle cx="{{ p.x }}" cy="{{ p.y }}" r="4" fill="{{ '#2563eb' if p.variant == 'subject' else '#15803d' }}" opacity=".65"><title>{{ p.variant }}: {{ p.size }} operations, {{ p.value }} {{ metric }}</title></circle>{% endfor %}</svg>
+<h2>Trials</h2><div class="scroll"><table><thead><tr><th>Variant</th><th>Workload</th><th>Repeat</th><th>OK</th><th>Before GC</th><th>After GC</th><th>After owner release</th><th>Traced bytes</th></tr></thead><tbody>
+{% for t in evidence.trials %}<tr><td>{{ t.variant }}</td><td>{{ t.completed }}/{{ t.size }}</td><td>{{ t.repeat+1 }}</td><td>{{ t.ok }}</td><td>{{ t.natural_survivors if t.natural_survivors is not none else '—' }}</td><td>{{ t.survivors if t.survivors is not none else '—' }}</td><td>{{ t.after_release if t.after_release is not none else '—' }}</td><td>{{ t.retained_bytes if t.retained_bytes is not none else '—' }}</td></tr>{% if t.error %}<tr><td colspan="8">{{ t.error }}</td></tr>{% endif %}{% endfor %}
+</tbody></table></div>
+<h2>Scope and limitations</h2><ul><li>Measurements describe this workload. They are not production memory savings or proof that an application is leak-free.</li>{% for item in evidence.limitations + evidence.assessment.limitations %}<li>{{ item }}</li>{% endfor %}</ul>
+{% if evidence.agent_review %}<h2>Agent review</h2><p>{{ evidence.agent_review }}</p>{% endif %}
+<h2>Reproduce</h2><pre>faultfinder replay &lt;this-bundle-directory&gt;</pre><p>Local experiments require an explicit --trusted-local flag. Generated code requires Docker. Source and harness hashes are validated before replay.</p>
+<h2>Provenance</h2><table><tr><th>Commit</th><td>{{ evidence.project.get('commit', '') or 'Not available' }}</td></tr><tr><th>Source digest</th><td>{{ evidence.project.get('source_sha256', '') }}</td></tr><tr><th>Dirty source</th><td>{{ evidence.project.get('dirty', false) }}</td></tr><tr><th>Policy</th><td>{{ evidence.plan.policy }}</td></tr></table>
+<p>Full trial metadata, allocation locations, owner types, and runtime fingerprints: <a href="evidence.json">evidence.json</a>.</p>
+</main></body></html>
