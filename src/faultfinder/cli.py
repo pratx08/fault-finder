@@ -2,6 +2,8 @@
 
 import hashlib
 import json
+import os
+import re
 import subprocess
 import sys
 import threading
@@ -14,7 +16,7 @@ import typer
 from rich.console import Console
 
 from faultfinder import __version__
-from faultfinder.agents import AgentClient
+from faultfinder.agents import AgentClient, CompatibleAPIClient
 from faultfinder.corpus import CASES
 from faultfinder.discovery import inspect_project
 from faultfinder.engine import investigate, prune
@@ -80,6 +82,25 @@ def policy(sizes: str, timeout: int) -> Policy:
         ) from exc
 
 
+def model_client(provider: str, model: str, api_url: str, api_key_env: str) -> AgentClient | None:
+    if provider == "ollama":
+        if api_url:
+            raise typer.BadParameter("--api-url requires --provider api")
+        return AgentClient(model) if model else None
+    if provider == "api":
+        if not api_url or not model:
+            raise typer.BadParameter("API mode requires --api-url and --model")
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", api_key_env):
+            raise typer.BadParameter("--api-key-env must name an environment variable")
+        key = os.environ.get(api_key_env, "")
+        if not key and sys.stdin.isatty() and sys.stdout.isatty():
+            key = typer.prompt("Model API key", hide_input=True)
+        if not key:
+            raise typer.BadParameter(f"Set {api_key_env} or run interactively to enter the key")
+        return CompatibleAPIClient(model, api_url, api_key=key)
+    raise typer.BadParameter("Provider must be ollama or api")
+
+
 @app.command("inspect")
 def inspect_command(project: Project = Path(".")) -> None:
     """Discover source, tests and static hypotheses without importing application code."""
@@ -96,12 +117,17 @@ def check(
     trusted_local: bool = False,
     image: str = "faultfinder-worker:local",
     model: str = "",
+    provider: Annotated[str, typer.Option(help="ollama or api (Chat Completions)")] = "ollama",
+    api_url: Annotated[str, typer.Option(help="HTTPS Chat Completions URL for api mode")] = "",
+    api_key_env: Annotated[str, typer.Option(help="API key variable; prompts if unset")] = (
+        "LLM_API_KEY"
+    ),
 ) -> None:
-    """Repeat existing tests, or investigate with a local model in Docker."""
+    """Repeat existing tests, or investigate with an explicit model provider in Docker."""
     args = list(ctx.args) or [tests]
     if args and args[0] == "pytest":
         args.pop(0)
-    if model and trusted_local:
+    if (model or provider == "api") and trusted_local:
         raise typer.BadParameter("Generated experiments require Docker; omit --trusted-local")
     plan = Plan(
         kind="pytest",
@@ -109,7 +135,7 @@ def check(
         args=args,
         policy=policy(sizes, timeout),
     )
-    agent = AgentClient(model) if model else None
+    agent = model_client(provider, model, api_url, api_key_env)
     try:
         bundle = investigate(
             project,
@@ -247,12 +273,17 @@ def watch(
 def worker_command(
     project: Project = Path("."),
     model: str = "",
+    provider: Annotated[str, typer.Option(help="ollama or api (Chat Completions)")] = "ollama",
+    api_url: Annotated[str, typer.Option(help="HTTPS Chat Completions URL for api mode")] = "",
+    api_key_env: Annotated[str, typer.Option(help="API key variable; prompts if unset")] = (
+        "LLM_API_KEY"
+    ),
     image: str = "faultfinder-worker:local",
     once: bool = False,
 ) -> None:
     """Drain the production candidate queue using Docker; never run probes in the app."""
     store = Store(project / ".faultfinder" / "jobs.sqlite3")
-    agent = AgentClient(model) if model else None
+    agent = model_client(provider, model, api_url, api_key_env)
     try:
         while True:
             job = store.claim()

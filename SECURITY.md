@@ -18,9 +18,12 @@ as safe, leak-free, or production-ready.
 ## Data handling
 
 Source snapshots, file paths, dependency fingerprints and measurements remain in the selected
-local artifact directory. Model requests go only to the configured loopback Ollama endpoint.
-No analytics or cloud model calls are enabled. Ordinary package/model downloads still require
-network access during setup.
+local artifact directory. Ollama model requests stay on the configured loopback endpoint. When
+`--provider api` is selected, bounded source snippets, candidate metadata and measured evidence
+are sent to the HTTPS endpoint supplied by the user. This can expose hardcoded secrets or private
+code to that provider. API keys are read from an environment variable or a hidden prompt and are
+never written to reports. No analytics or cloud calls occur unless API mode is explicitly chosen.
+Ordinary package/model downloads still require network access during setup.
 
 `.env`, Git metadata and known environment directories are excluded from snapshots. However,
 Python files and project configuration can contain hardcoded credentials or private information.

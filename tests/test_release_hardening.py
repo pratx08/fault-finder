@@ -56,7 +56,7 @@ def test_version_command():
         [sys.executable, "-m", "faultfinder", "--version"], capture_output=True, text=True
     )
     assert result.returncode == 0, result.stderr
-    assert "0.1.0" in result.stdout
+    assert "0.2.0" in result.stdout
 
 
 def test_cloud_model_tag_rejected():

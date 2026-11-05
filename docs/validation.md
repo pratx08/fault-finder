@@ -76,6 +76,10 @@ does not qualify production overhead or Linux behavior.
 
 ## Remaining production qualification
 
+The configurable Chat Completions adapter has protocol and CLI tests with mocked responses.
+No live third-party API was called during this release, so provider-specific compatibility and
+model-generated reproduction quality remain unverified.
+
 1. Run the installed local Ollama model against previously unseen projects and record its
    actual completion and failure rates. Mock protocol tests are not a substitute for this check.
 2. Evaluate a second independent real project and a held-out corpus. Publish actual false-positive
