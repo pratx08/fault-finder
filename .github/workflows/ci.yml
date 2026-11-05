@@ -39,6 +39,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --frozen --python 3.12
-      - run: docker build -t faultfinder-worker:local .
+      - run: docker build -t faultfinder-worker:0.2.0 .
       - run: uv run pytest -m docker
-      - run: docker run --rm --entrypoint python -v "${{ github.workspace }}/tests:/tests:ro" faultfinder-worker:local -m pytest /tests/test_verification.py /tests/test_observer.py /tests/test_end_to_end.py /tests/test_agent_workflow.py -q
+      - run: docker run --rm --entrypoint python -v "${{ github.workspace }}/tests:/tests:ro" faultfinder-worker:0.2.0 -m pytest /tests/test_verification.py /tests/test_observer.py /tests/test_end_to_end.py /tests/test_agent_workflow.py -q

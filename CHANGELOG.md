@@ -4,6 +4,7 @@
 
 - Add an opt-in bearer-authenticated Chat Completions provider with a configurable HTTPS endpoint.
 - Read API keys from an environment variable or hidden prompt; reject incomplete model responses.
+- Build the versioned base Docker worker automatically on first use when Docker is running.
 - Keep generated experiments isolated in Docker and deterministic evidence validation unchanged.
 
 ## 0.1.0 — 2026-11-05

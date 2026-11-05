@@ -14,10 +14,23 @@ from pathlib import Path
 
 import psutil
 
+from faultfinder import __version__
 from faultfinder.io import read_text
 from faultfinder.models import Plan, Trial
 
 MAX_OUTPUT = 1_000_000
+DEFAULT_IMAGE = f"faultfinder-worker:{__version__}"
+
+
+def docker_binary() -> str:
+    found = shutil.which("docker")
+    if found:
+        return found
+    if os.name == "nt" and (local := os.environ.get("LOCALAPPDATA")):
+        candidate = Path(local) / "Programs" / "DockerDesktop" / "resources" / "bin" / "docker.exe"
+        if candidate.is_file():
+            return str(candidate)
+    return "docker"
 
 
 def terminate_tree(process: subprocess.Popen) -> None:
@@ -99,18 +112,60 @@ def bounded_run(
 
 
 def docker_image_id(image: str) -> str:
-    if shutil.which("docker") is None:
-        raise RuntimeError("Docker is unavailable; install/start Docker for isolated execution")
+    binary = docker_binary()
     try:
         result = subprocess.run(
-            ["docker", "image", "inspect", "--format", "{{.Id}}", image],
+            [binary, "image", "inspect", "--format", "{{.Id}}", image],
             capture_output=True,
             text=True,
             timeout=15,
-            check=True,
         )
-    except subprocess.SubprocessError as exc:
-        raise RuntimeError("Docker worker image is unavailable; build it before running") from exc
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "Docker is unavailable; install/start Docker for isolated execution"
+        ) from exc
+    if result.returncode != 0:
+        if image != DEFAULT_IMAGE:
+            raise RuntimeError("Custom Docker worker image is unavailable")
+        try:
+            engine = subprocess.run(
+                [binary, "info", "--format", "{{.ServerVersion}}"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError("Docker engine is unavailable") from exc
+        if engine.returncode != 0:
+            raise RuntimeError("Docker engine is unavailable")
+        dockerfile = (
+            "FROM python:3.12-slim\n"
+            f"RUN python -m pip install --no-cache-dir fault-finder=={__version__}\n"
+            "ENV PYTHONDONTWRITEBYTECODE=1 HOME=/tmp\n"
+            "USER 65534:65534\n"
+            "WORKDIR /project\n"
+            'ENTRYPOINT ["python", "-m", "faultfinder.worker"]\n'
+        )
+        try:
+            built = subprocess.run(
+                [binary, "build", "--tag", DEFAULT_IMAGE, "-"],
+                input=dockerfile,
+                capture_output=True,
+                text=True,
+                timeout=300,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            raise RuntimeError("Automatic Docker worker build failed") from exc
+        if built.returncode != 0:
+            raise RuntimeError("Automatic Docker worker build failed")
+        result = subprocess.run(
+            [binary, "image", "inspect", "--format", "{{.Id}}", image],
+            capture_output=True,
+            text=True,
+            timeout=15,
+        )
+        if result.returncode != 0:
+            raise RuntimeError("Built Docker image could not be inspected")
     value = result.stdout.strip()
     if not value.startswith("sha256:"):
         raise RuntimeError("Could not resolve an immutable Docker image ID")
@@ -120,7 +175,7 @@ def docker_image_id(image: str) -> str:
 def docker_command(image: str, source: Path, io: Path, name: str, memory_mb: int) -> list[str]:
     # Bind only the allowlisted snapshot. Code can still contain hardcoded secrets.
     return [
-        "docker",
+        docker_binary(),
         "run",
         "--rm",
         "--name",
@@ -224,4 +279,6 @@ def run_trial(
         finally:
             if backend == "docker":
                 with suppress(OSError, subprocess.SubprocessError):
-                    subprocess.run(["docker", "rm", "-f", name], capture_output=True, timeout=10)
+                    subprocess.run(
+                        [docker_binary(), "rm", "-f", name], capture_output=True, timeout=10
+                    )

@@ -10,7 +10,7 @@ from pathlib import Path
 
 from faultfinder.agents import AgentClient
 from faultfinder.discovery import inspect_project
-from faultfinder.execution import docker_image_id, run_trial
+from faultfinder.execution import DEFAULT_IMAGE, docker_image_id, run_trial
 from faultfinder.io import atomic_text, read_text
 from faultfinder.models import Assessment, Evidence, Plan, Trial, Verdict
 from faultfinder.reporting import write_report
@@ -65,7 +65,7 @@ def investigate(
     plan: Plan,
     output_root: Path,
     backend: str = "docker",
-    image: str = "faultfinder-worker:local",
+    image: str = DEFAULT_IMAGE,
     agent: AgentClient | None = None,
     observation: dict | None = None,
 ) -> Path:
@@ -171,7 +171,7 @@ def replay(bundle: Path, output_root: Path, trusted_local: bool) -> Path:
         original.plan,
         output_root,
         original.backend,
-        original.project.get("image_id") or "faultfinder-worker:local",
+        original.project.get("image_id") or DEFAULT_IMAGE,
     )
     replayed = validate_bundle(result)
     old_runtimes = {tuple(sorted(t.runtime.items())) for t in original.trials if t.ok}

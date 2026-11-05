@@ -24,6 +24,7 @@ are sent to the HTTPS endpoint supplied by the user. This can expose hardcoded s
 code to that provider. API keys are read from an environment variable or a hidden prompt and are
 never written to reports. No analytics or cloud calls occur unless API mode is explicitly chosen.
 Ordinary package/model downloads still require network access during setup.
+The default Docker worker build downloads the published Fault Finder version on first use.
 
 `.env`, Git metadata and known environment directories are excluded from snapshots. However,
 Python files and project configuration can contain hardcoded credentials or private information.

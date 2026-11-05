@@ -11,7 +11,7 @@ uv run mypy src/faultfinder
 uv run pytest -m "not docker"
 ```
 
-Container changes also require building `faultfinder-worker:local` and running
+Container changes also require building `faultfinder-worker:0.2.0` and running
 `uv run pytest -m docker`. Tests that need Docker must not silently pass when the daemon or
 image is broken; an absent executable is reported as a skip in developer environments.
 

@@ -21,7 +21,7 @@ from faultfinder.corpus import CASES
 from faultfinder.discovery import inspect_project
 from faultfinder.engine import investigate, prune
 from faultfinder.engine import replay as replay_bundle
-from faultfinder.execution import terminate_tree
+from faultfinder.execution import DEFAULT_IMAGE, terminate_tree
 from faultfinder.io import read_text
 from faultfinder.models import Evidence, Plan, Policy, Verdict
 from faultfinder.observer import GrowthDetector, Sample
@@ -115,7 +115,7 @@ def check(
     sizes: str = "0,5,10",
     timeout: int = 900,
     trusted_local: bool = False,
-    image: str = "faultfinder-worker:local",
+    image: str = DEFAULT_IMAGE,
     model: str = "",
     provider: Annotated[str, typer.Option(help="ollama or api (Chat Completions)")] = "ollama",
     api_url: Annotated[str, typer.Option(help="HTTPS Chat Completions URL for api mode")] = "",
@@ -278,7 +278,7 @@ def worker_command(
     api_key_env: Annotated[str, typer.Option(help="API key variable; prompts if unset")] = (
         "LLM_API_KEY"
     ),
-    image: str = "faultfinder-worker:local",
+    image: str = DEFAULT_IMAGE,
     once: bool = False,
 ) -> None:
     """Drain the production candidate queue using Docker; never run probes in the app."""

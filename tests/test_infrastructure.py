@@ -8,7 +8,7 @@ import pytest
 from faultfinder.agents import AgentClient, Review
 from faultfinder.discovery import inspect_project
 from faultfinder.engine import investigate, validate_bundle
-from faultfinder.execution import bounded_run, docker_command, run_trial
+from faultfinder.execution import bounded_run, docker_binary, docker_command, run_trial
 from faultfinder.models import Plan, Policy, Verdict
 from faultfinder.store import Store
 
@@ -67,6 +67,53 @@ def test_docker_boundary_has_required_restrictions(tmp_path):
     ):
         assert restriction in args
     assert "docker.sock" not in " ".join(args)
+
+
+def test_default_worker_image_is_built_once_when_missing(monkeypatch):
+    import subprocess
+
+    import faultfinder.execution as execution
+
+    monkeypatch.setattr(execution, "docker_binary", lambda: "docker")
+    commands = []
+    inspections = 0
+
+    def run(command, **kwargs):
+        nonlocal inspections
+        commands.append(command)
+        if command[1:3] == ["image", "inspect"]:
+            inspections += 1
+            return subprocess.CompletedProcess(
+                command, 1 if inspections == 1 else 0, stdout="sha256:built\n"
+            )
+        if command[1] == "info":
+            return subprocess.CompletedProcess(command, 0, stdout="29.0\n")
+        assert command[1] == "build"
+        assert "fault-finder==" in kwargs["input"]
+        assert execution.DEFAULT_IMAGE == command[3]
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(execution.subprocess, "run", run)
+    assert execution.docker_image_id(execution.DEFAULT_IMAGE) == "sha256:built"
+    assert [command[1] for command in commands] == ["image", "info", "build", "image"]
+
+
+def test_missing_custom_worker_image_does_not_build(monkeypatch):
+    import subprocess
+
+    import faultfinder.execution as execution
+
+    monkeypatch.setattr(execution, "docker_binary", lambda: "docker")
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append(command)
+        return subprocess.CompletedProcess(command, 1, stdout="")
+
+    monkeypatch.setattr(execution.subprocess, "run", run)
+    with pytest.raises(RuntimeError, match="Custom Docker worker image"):
+        execution.docker_image_id("custom-worker:v1")
+    assert len(commands) == 1
 
 
 def test_local_model_schema_is_validated_and_verdict_is_not_an_output():
@@ -137,7 +184,7 @@ def test_unavailable_docker_produces_report_not_success(tmp_path, monkeypatch):
 def test_docker_executes_corpus(tmp_path):
     import shutil
 
-    if not shutil.which("docker"):
+    if not shutil.which(docker_binary()):
         pytest.skip("Docker is not installed")
     project = tmp_path / "project"
     project.mkdir()

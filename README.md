@@ -46,13 +46,13 @@ selection that can be repeated safely. No application payloads or stdout are sav
 ## Isolated execution and agents
 
 ```sh
-docker build -t faultfinder-worker:local .
-uv run faultfinder check path/to/project --image faultfinder-worker:local
 uv run faultfinder check path/to/project --model YOUR_INSTALLED_OLLAMA_MODEL
 ```
 
-The base worker includes FaultFinder and pytest, not arbitrary application dependencies. Build a
-derived image with the project's pinned dependencies installed **before** investigation.
+The versioned base worker image builds automatically on first use when Docker is running. It
+installs the published Fault Finder version and pytest, not arbitrary application dependencies.
+Build a custom image with the project's pinned dependencies installed **before** investigation
+and select it with `--image` when needed.
 Runtime containers have no network. Missing packages or fixtures give an inconclusive result.
 Use your project's locked install method; do not resolve new dependency versions during trials.
 
@@ -79,7 +79,8 @@ that name. The endpoint must use HTTPS, except for loopback servers. The provide
 JSON object in `choices[0].message.content`; malformed or incomplete answers are inconclusive.
 Only bounded source snippets and measurements are sent to the selected provider. Review code for
 hardcoded secrets first. Your provider may charge for these requests. Generated probes still run
-in Docker, so a running Docker engine and a worker image with project dependencies are required.
+in Docker, so a running Docker engine is required. Projects with extra dependencies need a
+custom worker image.
 
 ## Production observation
 
